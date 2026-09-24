@@ -861,11 +861,20 @@
     // Quick Debug Sound button in hero card
     if (btnQuickDebugSound) {
       btnQuickDebugSound.addEventListener('click', () => {
+        // Play Web Audio synth
         playAudibleSynthBeep(440, 0.5);
+        // ALSO play HTML5 Audio (bypasses iOS hardware silent switch)
+        try {
+          const testAudio = new Audio('sounds/debug_test_beep.mp3');
+          testAudio.volume = masterVolume;
+          const p = testAudio.play();
+          if (p !== undefined) p.catch(() => {});
+        } catch (e) {}
+
         triggerHaptic(25);
         if (debugStatusToast) {
           debugStatusToast.style.display = 'block';
-          debugStatusToast.innerHTML = `🔊 <strong>Dispatched 440 Hz Beep!</strong><br>If silent: Check your iPhone Silent Switch (top-left) and volume UP button.`;
+          debugStatusToast.innerHTML = `🔊 <strong>Playing 440 Hz Standard Beep!</strong><br>If silent: Check iPhone Silent Switch (top-left) & media volume.`;
           setTimeout(() => {
             if (debugStatusToast) debugStatusToast.style.display = 'none';
           }, 4500);
