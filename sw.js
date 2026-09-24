@@ -1,6 +1,6 @@
 // sw.js - Bark Service Worker for 100% Offline PWA Experience
 
-const CACHE_NAME = 'bark-v1.0.1';
+const CACHE_NAME = 'bark-v1.0.2';
 
 const PRECACHE_ASSETS = [
   './',

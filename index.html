@@ -85,7 +85,7 @@
     <!-- iOS Silent Switch Tip Banner -->
     <div class="ios-silent-banner" id="iosSilentBanner" style="display: none;">
       <span class="banner-icon">🔔</span>
-      <span class="banner-text"><strong>iPhone audio:</strong> If you hear no sound, check that the Silent Switch (side of phone) is turned OFF and volume is turned up.</span>
+      <span class="banner-text"><strong>iPhone audio:</strong> If no sound, turn OFF the Silent Switch (side of phone). <button id="btnBannerRefresh" style="background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 4px; padding: 1px 5px; font-size: 0.72rem; cursor: pointer;">🔄 Hard Refresh</button></span>
       <button class="banner-close" id="dismissIosBanner" aria-label="Dismiss">✕</button>
     </div>
 
@@ -273,6 +273,10 @@
             <br>• <strong>Check Silent Switch:</strong> The switch on the top-left edge of your iPhone must NOT show orange.
             <br>• <strong>Check Volume:</strong> Use the physical volume UP button on the side of your phone.
           </div>
+
+          <button id="btnHardRefresh" class="btn-secondary" style="width: 100%; border-color: rgba(245, 158, 11, 0.4); color: var(--primary); margin-top: 4px;">
+            🔄 Force Hard Refresh & Clear Offline Cache
+          </button>
         </div>
         <div class="modal-footer">
           <button class="btn-secondary close-dialog">Close</button>
@@ -347,6 +351,10 @@
           <p style="font-size: 0.78rem; color: var(--text-dim); margin-top: 6px;">
             Audio recordings sourced from the ESC-50 Environmental Sound Classification dataset and Wikimedia Commons under Creative Commons (CC-BY / CC0 / Public Domain).
           </p>
+
+          <button id="btnAboutHardRefresh" class="btn-secondary" style="width: 100%; border-color: rgba(245, 158, 11, 0.4); color: var(--primary); margin-top: 6px;">
+            🔄 Force Hard Refresh & Clear Offline Cache
+          </button>
         </div>
         <div class="modal-footer">
           <button class="btn-secondary close-dialog">Done</button>

@@ -902,6 +902,43 @@
         }
       });
     }
+
+    // Force Hard Refresh & Cache Clear Handlers
+    const hardRefreshButtons = [
+      document.getElementById('btnHardRefresh'),
+      document.getElementById('btnAboutHardRefresh'),
+      document.getElementById('btnBannerRefresh')
+    ];
+
+    hardRefreshButtons.forEach((btn) => {
+      if (btn) {
+        btn.addEventListener('click', async () => {
+          btn.textContent = 'Clearing cache & reloading...';
+          btn.style.opacity = '0.7';
+          await forceHardRefresh();
+        });
+      }
+    });
+  }
+
+  async function forceHardRefresh() {
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.unregister();
+        }
+      }
+    } catch (e) {
+      console.warn('Cache clear error:', e);
+    }
+    // Hard reload with cache buster query parameter
+    const cleanUrl = window.location.origin + window.location.pathname + '?v=' + Date.now();
+    window.location.replace(cleanUrl);
   }
 
   // --- Dialog / Modal Management ---
