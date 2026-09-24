@@ -64,6 +64,13 @@
           </svg>
         </button>
 
+        <!-- Audio Diagnostics & Test -->
+        <button id="btnOpenDebug" class="icon-btn" title="Audio Diagnostics & Debug Sound" aria-label="Audio Diagnostics & Debug Sound">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+          </svg>
+        </button>
+
         <!-- About Modal -->
         <button id="btnOpenAbout" class="icon-btn" title="About Bark" aria-label="About Bark">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -106,6 +113,12 @@
         <span class="pad-icon" id="heroPadIcon">🐕</span>
         <span id="heroPadText">TAP TO BARK</span>
       </button>
+
+      <!-- Quick Audible Debug Sound Button -->
+      <button id="btnQuickDebugSound" class="quick-debug-btn" type="button">
+        <span>🧪 Play Audible Debug Sound (440Hz Beep)</span>
+      </button>
+      <div id="debugStatusToast" class="debug-status-toast" style="display: none;"></div>
     </section>
 
     <!-- Navigation Tabs: Dogs / Cats / Settings -->
@@ -197,19 +210,72 @@
     <dialog id="whistleModal">
       <div class="modal-content">
         <div class="modal-header">
-          <h2 class="modal-title">🔊 Ultrasonic Dog Whistle</h2>
+          <h2 class="modal-title">🔊 Dog Whistle & Pitch Generator</h2>
           <button class="icon-btn close-dialog" aria-label="Close">✕</button>
         </div>
         <div class="modal-body">
-          <p>Dogs can hear up to <strong>45,000 Hz</strong>, while humans rarely hear above 16,000–18,000 Hz. Adjust the frequency for training or pet attention.</p>
+          <p style="font-size: 0.82rem; line-height: 1.4;">
+            Dogs hear frequencies up to <strong>45,000 Hz</strong>, while adult humans rarely hear above 14,000–16,000 Hz. If you can't hear high frequencies, that is completely normal!
+          </p>
+
+          <!-- Presets -->
+          <div class="prank-presets" style="margin-top: 4px;">
+            <button class="btn-whistle-preset btn-prank-time" data-hz="1000">1 kHz (Audible)</button>
+            <button class="btn-whistle-preset btn-prank-time" data-hz="5000">5 kHz (Whistle)</button>
+            <button class="btn-whistle-preset btn-prank-time" data-hz="12000">12 kHz (High)</button>
+            <button class="btn-whistle-preset btn-prank-time selected" data-hz="16000">16 kHz (Dog)</button>
+          </div>
+
           <div class="whistle-display">
             <div class="whistle-freq" id="whistleFreqDisplay">16,000 Hz</div>
-            <div class="whistle-note" id="whistleAudibility">Near human hearing threshold (Youth / Pets)</div>
+            <div class="whistle-note" id="whistleAudibility">⚠️ Ultrasonic: Inaudible to most adult humans • Dogs hear clearly</div>
           </div>
-          <input type="range" id="whistleSlider" class="range-slider" min="12000" max="22000" step="250" value="16000">
+
+          <input type="range" id="whistleSlider" class="range-slider" min="500" max="20000" step="250" value="16000">
+        </div>
+        <div class="modal-footer" style="flex-direction: column; gap: 8px;">
+          <button id="btnWhistleToggle" class="btn-primary" style="width: 100%;">START TONE</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- 2. Audio Diagnostics & Debug Modal -->
+    <dialog id="debugModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">🛠️ Audio Test & Diagnostics</h2>
+          <button class="icon-btn close-dialog" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Test audible sound generators directly to confirm your iPhone/Android speaker is active:</p>
+          
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <button id="btnDiagBeep" class="btn-primary" style="background: #2563eb; width: 100%;">
+              🔊 Test 1: 440 Hz Beep (Web Audio Synth)
+            </button>
+            <button id="btnDiagChime" class="btn-primary" style="background: #059669; width: 100%;">
+              🔔 Test 2: 880 Hz Harmonic Chime
+            </button>
+            <button id="btnDiagMp3" class="btn-primary" style="background: #d97706; width: 100%;">
+              🐕 Test 3: MP3 Test File (Big Dog Woof)
+            </button>
+          </div>
+
+          <div class="diagnostics-box" id="diagnosticsBox">
+            <div><strong>AudioContext:</strong> <span id="diagWebAudio">Ready</span></div>
+            <div><strong>iOS AudioSession:</strong> <span id="diagSession">playback</span></div>
+            <div><strong>Speaker Status:</strong> <span id="diagStatus">Idle</span></div>
+            <div><strong>Log:</strong> <span id="diagLog">Tap any test button above</span></div>
+          </div>
+
+          <div class="diag-tip">
+            <strong>⚠️ Still no sound on iPhone?</strong>
+            <br>• <strong>Check Silent Switch:</strong> The switch on the top-left edge of your iPhone must NOT show orange.
+            <br>• <strong>Check Volume:</strong> Use the physical volume UP button on the side of your phone.
+          </div>
         </div>
         <div class="modal-footer">
-          <button id="btnWhistleToggle" class="btn-primary" style="width: 100%;">START WHISTLE</button>
+          <button class="btn-secondary close-dialog">Close</button>
         </div>
       </div>
     </dialog>

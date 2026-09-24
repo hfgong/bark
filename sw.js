@@ -18,6 +18,7 @@ const PRECACHE_ASSETS = [
   './sounds/dog_alert.mp3',
   './sounds/dog_playful.mp3',
   './sounds/dog_wolf_howl.mp3',
+  './sounds/debug_test_beep.mp3',
   './sounds/cat_classic_meow.mp3',
   './sounds/cat_kitten_squeak.mp3',
   './sounds/cat_gentle_purr.mp3',

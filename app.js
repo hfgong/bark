@@ -219,11 +219,24 @@
   const prankModal = document.getElementById('prankModal');
   const shareModal = document.getElementById('shareModal');
   const aboutModal = document.getElementById('aboutModal');
+  const debugModal = document.getElementById('debugModal');
 
   const btnOpenWhistle = document.getElementById('btnOpenWhistle');
   const btnOpenPrank = document.getElementById('btnOpenPrank');
   const btnOpenShare = document.getElementById('btnOpenShare');
   const btnOpenAbout = document.getElementById('btnOpenAbout');
+  const btnOpenDebug = document.getElementById('btnOpenDebug');
+
+  const btnQuickDebugSound = document.getElementById('btnQuickDebugSound');
+  const debugStatusToast = document.getElementById('debugStatusToast');
+
+  const btnDiagBeep = document.getElementById('btnDiagBeep');
+  const btnDiagChime = document.getElementById('btnDiagChime');
+  const btnDiagMp3 = document.getElementById('btnDiagMp3');
+  const diagWebAudio = document.getElementById('diagWebAudio');
+  const diagSession = document.getElementById('diagSession');
+  const diagStatus = document.getElementById('diagStatus');
+  const diagLog = document.getElementById('diagLog');
 
   const whistleSlider = document.getElementById('whistleSlider');
   const whistleFreqDisplay = document.getElementById('whistleFreqDisplay');
@@ -649,22 +662,48 @@
   }
 
   // --- Ultrasonic Dog Whistle Logic ---
+  function updateWhistleDisplay(freq) {
+    whistleFreqDisplay.textContent = `${freq.toLocaleString()} Hz`;
+
+    if (freq >= 16000) {
+      whistleAudibility.innerHTML = '⚠️ <strong>Ultrasonic:</strong> Inaudible to most adult humans • Dogs hear up to 45,000 Hz';
+      whistleAudibility.style.color = 'var(--warning)';
+    } else if (freq >= 12000) {
+      whistleAudibility.innerHTML = '⚡ <strong>High Frequency:</strong> Audible to children & pets, faint to adults';
+      whistleAudibility.style.color = 'var(--text-muted)';
+    } else {
+      whistleAudibility.innerHTML = '🔊 <strong>Audible Range:</strong> Clearly heard by both humans and pets';
+      whistleAudibility.style.color = 'var(--success)';
+    }
+  }
+
   function setupWhistle() {
     whistleSlider.addEventListener('input', (e) => {
       const freq = parseInt(e.target.value, 10);
-      whistleFreqDisplay.textContent = `${freq.toLocaleString()} Hz`;
+      updateWhistleDisplay(freq);
 
-      if (freq >= 20000) {
-        whistleAudibility.textContent = 'Silent to humans • Dogs & Cats hear clearly';
-      } else if (freq >= 16000) {
-        whistleAudibility.textContent = 'Near human hearing threshold • Dogs hear intensely';
-      } else {
-        whistleAudibility.textContent = 'Audible high whistle to youth & pets';
-      }
+      // Deselect preset buttons if custom slider value
+      document.querySelectorAll('.btn-whistle-preset').forEach((b) => {
+        b.classList.toggle('selected', parseInt(b.dataset.hz, 10) === freq);
+      });
 
       if (whistleOsc && audioCtx) {
         whistleOsc.frequency.setValueAtTime(freq, audioCtx.currentTime);
       }
+    });
+
+    document.querySelectorAll('.btn-whistle-preset').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn-whistle-preset').forEach((b) => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        const hz = parseInt(btn.dataset.hz, 10);
+        whistleSlider.value = hz;
+        updateWhistleDisplay(hz);
+        triggerHaptic(15);
+        if (whistleOsc && audioCtx) {
+          whistleOsc.frequency.setValueAtTime(hz, audioCtx.currentTime);
+        }
+      });
     });
 
     btnWhistleToggle.addEventListener('click', () => {
@@ -761,13 +800,118 @@
     });
   }
 
+  // --- Audio Diagnostics & Debug Sound Logic ---
+  function playAudibleSynthBeep(freq = 440, duration = 0.5) {
+    unlockAudioEngine();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+
+    gain.gain.setValueAtTime(0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    osc.connect(gain);
+    gain.connect(masterGainNode || ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + duration);
+  }
+
+  function playAudibleChime() {
+    unlockAudioEngine();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const now = ctx.currentTime;
+    [
+      { f: 523.25, t: 0 },    // C5
+      { f: 659.25, t: 0.12 }, // E5
+      { f: 783.99, t: 0.24 }, // G5
+      { f: 1046.5, t: 0.36 }  // C6
+    ].forEach(({ f, t }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, now + t);
+      gain.gain.setValueAtTime(0.4, now + t);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + t + 0.4);
+      osc.connect(gain);
+      gain.connect(masterGainNode || ctx.destination);
+      osc.start(now + t);
+      osc.stop(now + t + 0.45);
+    });
+  }
+
+  function updateDiagInfo(status, log) {
+    if (diagWebAudio && audioCtx) diagWebAudio.textContent = audioCtx.state;
+    if (diagSession) diagSession.textContent = ('audioSession' in navigator ? navigator.audioSession.type : 'standard');
+    if (diagStatus) diagStatus.textContent = status;
+    if (diagLog) diagLog.textContent = log;
+  }
+
+  function setupDiagnostics() {
+    // Quick Debug Sound button in hero card
+    if (btnQuickDebugSound) {
+      btnQuickDebugSound.addEventListener('click', () => {
+        playAudibleSynthBeep(440, 0.5);
+        triggerHaptic(25);
+        if (debugStatusToast) {
+          debugStatusToast.style.display = 'block';
+          debugStatusToast.innerHTML = `🔊 <strong>Dispatched 440 Hz Beep!</strong><br>If silent: Check your iPhone Silent Switch (top-left) and volume UP button.`;
+          setTimeout(() => {
+            if (debugStatusToast) debugStatusToast.style.display = 'none';
+          }, 4500);
+        }
+      });
+    }
+
+    // Diagnostics Modal Buttons
+    if (btnDiagBeep) {
+      btnDiagBeep.addEventListener('click', () => {
+        playAudibleSynthBeep(440, 0.5);
+        updateDiagInfo('Web Audio Synth (440Hz)', 'Dispatched sine wave 440Hz to audio output');
+      });
+    }
+
+    if (btnDiagChime) {
+      btnDiagChime.addEventListener('click', () => {
+        playAudibleChime();
+        updateDiagInfo('Harmonic Chime', 'Dispatched 4-chord bell chime to audio output');
+      });
+    }
+
+    if (btnDiagMp3) {
+      btnDiagMp3.addEventListener('click', () => {
+        const audio = new Audio('sounds/debug_test_beep.mp3');
+        audio.volume = masterVolume;
+        const p = audio.play();
+        if (p !== undefined) {
+          p.then(() => {
+            updateDiagInfo('MP3 Test File', 'Playing sounds/debug_test_beep.mp3 successfully');
+          }).catch((err) => {
+            updateDiagInfo('MP3 Error', err.message);
+          });
+        }
+      });
+    }
+  }
+
   // --- Dialog / Modal Management ---
   function setupModals() {
     const dialogs = [
       { btn: btnOpenWhistle, dialog: whistleModal },
       { btn: btnOpenPrank, dialog: prankModal },
       { btn: btnOpenShare, dialog: shareModal },
-      { btn: btnOpenAbout, dialog: aboutModal }
+      { btn: btnOpenAbout, dialog: aboutModal },
+      { btn: btnOpenDebug, dialog: debugModal }
     ];
 
     dialogs.forEach(({ btn, dialog }) => {
@@ -899,6 +1043,7 @@
     setupWhistle();
     setupPrank();
     setupModals();
+    setupDiagnostics();
     setupIOSBanner();
     setupPWA();
   }
