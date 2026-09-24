@@ -1,10 +1,25 @@
 /**
  * app.js - Bark Offline Dog & Cat Soundboard
- * Zero-dependency, 100% client-side Web Audio & PWA logic
+ * Zero-dependency, 100% client-side Web Audio & HTML5 Audio hybrid engine
+ * Built with full iOS Safari silent-switch bypass & offline PWA support.
  */
 
 (function () {
   'use strict';
+
+  // Detect iOS (iPhone / iPad / iPod)
+  const isIOS =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  // Set modern WebKit AudioSession to 'playback' mode so audio plays even when Silent Switch is on
+  if ('audioSession' in navigator) {
+    try {
+      navigator.audioSession.type = 'playback';
+    } catch (e) {
+      console.warn('[Bark] audioSession configuration:', e);
+    }
+  }
 
   // --- Sound Catalog (8 Dogs + 8 Cats) ---
   const SOUNDS = [
@@ -147,13 +162,16 @@
   let masterVolume = 1.0;
   let pitchMultiplier = 1.0;
   let isLooping = false;
-  let activeAudioNodes = []; // List of playing sources
 
-  // Web Audio Context & Nodes
+  // Pre-instantiated HTML5 Audio Elements pool for zero-latency & silent-switch bypass
+  const audioElements = new Map();
+  let currentlyPlayingAudio = null;
+
+  // Web Audio Context & Nodes for Oscilloscope & Ultrasonic Whistle
   let audioCtx = null;
   let masterGainNode = null;
   let analyserNode = null;
-  const audioBufferCache = new Map();
+  let isAudioUnlocked = false;
 
   // Whistle State
   let whistleOsc = null;
@@ -194,6 +212,7 @@
 
   const visualizerCanvas = document.getElementById('visualizerCanvas');
   const networkBadge = document.getElementById('networkBadge');
+  const iosSilentBanner = document.getElementById('iosSilentBanner');
 
   // Dialogs
   const whistleModal = document.getElementById('whistleModal');
@@ -215,138 +234,212 @@
   const prankCountdown = document.getElementById('prankCountdown');
   const btnStartPrank = document.getElementById('btnStartPrank');
 
-  // --- Audio Engine Initialization ---
+  // --- Preload HTML5 Audio Pool ---
+  function initAudioElements() {
+    SOUNDS.forEach((sound) => {
+      const audio = new Audio();
+      audio.src = sound.file;
+      audio.preload = 'auto';
+      audio.volume = masterVolume;
+      audioElements.set(sound.id, audio);
+    });
+  }
+
+  // --- Web Audio Initialization & iOS Unlock ---
   function getAudioContext() {
     if (!audioCtx) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      audioCtx = new AudioContextClass();
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
 
-      // Master Gain
-      masterGainNode = audioCtx.createGain();
-      masterGainNode.gain.setValueAtTime(masterVolume, audioCtx.currentTime);
+        masterGainNode = audioCtx.createGain();
+        masterGainNode.gain.setValueAtTime(masterVolume, audioCtx.currentTime);
 
-      // Analyser for real-time waveform visualizer
-      analyserNode = audioCtx.createAnalyser();
-      analyserNode.fftSize = 256;
-      analyserNode.smoothingTimeConstant = 0.8;
+        analyserNode = audioCtx.createAnalyser();
+        analyserNode.fftSize = 256;
+        analyserNode.smoothingTimeConstant = 0.8;
 
-      masterGainNode.connect(analyserNode);
-      analyserNode.connect(audioCtx.destination);
+        masterGainNode.connect(analyserNode);
+        analyserNode.connect(audioCtx.destination);
 
-      // Start oscilloscope rendering loop
-      initVisualizer();
+        initVisualizer();
+      }
     }
-    if (audioCtx.state === 'suspended') {
+    if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
     return audioCtx;
   }
 
-  // Pre-load audio buffer via fetch or fallback
-  async function loadAudioBuffer(sound) {
-    if (audioBufferCache.has(sound.id)) {
-      return audioBufferCache.get(sound.id);
+  // Synchronous unlock triggered immediately on the first touch/click
+  function unlockAudioEngine() {
+    if (isAudioUnlocked) return;
+
+    if ('audioSession' in navigator) {
+      try {
+        navigator.audioSession.type = 'playback';
+      } catch (e) {}
     }
 
+    // 1. Unlock Web Audio Context
     const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    // Play a tiny silent buffer synchronously
+    if (ctx) {
+      try {
+        const buffer = ctx.createBuffer(1, 1, 22050);
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ctx.destination);
+        source.start(0);
+      } catch (e) {}
+    }
+
+    // 2. Play inaudible HTML5 audio to force iOS audio session category to "Playback" (bypassing Silent Switch)
     try {
-      const response = await fetch(sound.file);
-      const arrayBuffer = await response.arrayBuffer();
-      const decoded = await ctx.decodeAudioData(arrayBuffer);
-      audioBufferCache.set(sound.id, decoded);
-      return decoded;
-    } catch (err) {
-      console.warn(`[Bark] Could not decode ${sound.file}, using synthetic fallback`, err);
-      const synthetic = createSyntheticAudio(ctx, sound.category);
-      audioBufferCache.set(sound.id, synthetic);
-      return synthetic;
-    }
-  }
-
-  // High-quality procedural synthesizer fallback (100% offline guarantee)
-  function createSyntheticAudio(ctx, category) {
-    const sampleRate = ctx.sampleRate;
-    const duration = category === 'dog' ? 0.35 : 0.6;
-    const numFrames = Math.floor(sampleRate * duration);
-    const buffer = ctx.createBuffer(1, numFrames, sampleRate);
-    const data = buffer.getChannelData(0);
-
-    for (let i = 0; i < numFrames; i++) {
-      const t = i / sampleRate;
-      if (category === 'dog') {
-        // Bark envelope + frequency drop + noise burst
-        const env = Math.exp(-t * 14) * (1 - Math.exp(-t * 120));
-        const freq = 280 * Math.exp(-t * 8) + 120;
-        const tone = Math.sin(2 * Math.PI * freq * t) + 0.4 * Math.sin(4 * Math.PI * freq * t);
-        const noise = (Math.random() * 2 - 1) * 0.35;
-        data[i] = (tone + noise) * env;
-      } else {
-        // Cat meow frequency modulation (rising then falling formant)
-        const env = Math.sin((t / duration) * Math.PI);
-        const freq = 550 + 250 * Math.sin((t / duration) * Math.PI);
-        const tone = Math.sin(2 * Math.PI * freq * t) + 0.3 * Math.sin(4 * Math.PI * freq * t);
-        data[i] = tone * env * 0.7;
+      const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+      silentAudio.volume = 0.01;
+      const playPromise = silentAudio.play();
+      if (playPromise) {
+        playPromise.catch(() => {});
       }
-    }
-    return buffer;
+    } catch (e) {}
+
+    isAudioUnlocked = true;
   }
 
-  // Play a sound by definition
-  async function playSound(sound) {
-    const ctx = getAudioContext();
+  // Bind unlock to all direct user gesture events
+  ['pointerdown', 'touchstart', 'touchend', 'click'].forEach((eventName) => {
+    window.addEventListener(eventName, unlockAudioEngine, { once: true, passive: true });
+  });
+
+  // --- Sound Playback Function ---
+  // Plays synchronously inside the user activation event loop to comply with iOS Safari
+  function playSound(sound) {
+    unlockAudioEngine();
     triggerHaptic(30);
 
+    // Stop currently playing audio if not looping or if switching sounds
+    if (currentlyPlayingAudio && !isLooping) {
+      try {
+        currentlyPlayingAudio.pause();
+        currentlyPlayingAudio.currentTime = 0;
+      } catch (e) {}
+    }
+
+    let audio = audioElements.get(sound.id);
+    if (!audio) {
+      audio = new Audio(sound.file);
+      audioElements.set(sound.id, audio);
+    }
+
     try {
-      const buffer = await loadAudioBuffer(sound);
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.playbackRate.setValueAtTime(pitchMultiplier, ctx.currentTime);
-      source.loop = isLooping;
+      audio.currentTime = 0;
+      audio.volume = masterVolume;
+      audio.playbackRate = pitchMultiplier;
+      audio.loop = isLooping;
 
-      source.connect(masterGainNode);
+      currentlyPlayingAudio = audio;
 
-      // Track active nodes
-      const activeObj = { id: sound.id, source: source };
-      activeAudioNodes.push(activeObj);
-
-      // UI state updates
+      // Update UI to playing state
       setCardPlayingUI(sound.id, true);
       heroTriggerBtn.classList.add('playing');
       heroEqBars.style.opacity = '1';
 
+      audio.onended = () => {
+        setCardPlayingUI(sound.id, false);
+        heroTriggerBtn.classList.remove('playing');
+        heroEqBars.style.opacity = '0';
+        currentlyPlayingAudio = null;
+      };
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('[Bark] HTML5 play error, trying Web Audio fallback:', err);
+          playWebAudioFallback(sound);
+        });
+      }
+    } catch (err) {
+      console.warn('[Bark] Playback exception, trying Web Audio fallback:', err);
+      playWebAudioFallback(sound);
+    }
+  }
+
+  // Secondary Web Audio fallback with procedural synthesis
+  async function playWebAudioFallback(sound) {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
+      const response = await fetch(sound.file);
+      const arrayBuffer = await response.arrayBuffer();
+      const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+      const source = ctx.createBufferSource();
+      source.buffer = decodedBuffer;
+      source.playbackRate.setValueAtTime(pitchMultiplier, ctx.currentTime);
+      source.loop = isLooping;
+      source.connect(masterGainNode);
+
       source.onended = () => {
-        activeAudioNodes = activeAudioNodes.filter((item) => item !== activeObj);
-        // If no more instances of this sound are playing, reset UI
-        if (!activeAudioNodes.some((item) => item.id === sound.id)) {
-          setCardPlayingUI(sound.id, false);
-        }
-        if (activeAudioNodes.length === 0) {
-          heroTriggerBtn.classList.remove('playing');
-          heroEqBars.style.opacity = '0';
-        }
+        setCardPlayingUI(sound.id, false);
+        heroTriggerBtn.classList.remove('playing');
+        heroEqBars.style.opacity = '0';
       };
 
       source.start(0);
     } catch (e) {
-      console.error('[Bark] Playback error:', e);
+      console.warn('[Bark] Web Audio file decode failed, playing procedural synth:', e);
+      playProceduralSynth(sound.category);
     }
   }
 
+  // 100% offline synthetic tone fallback
+  function playProceduralSynth(category) {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const sampleRate = ctx.sampleRate;
+    const duration = category === 'dog' ? 0.35 : 0.6;
+    const buffer = ctx.createBuffer(1, Math.floor(sampleRate * duration), sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < buffer.length; i++) {
+      const t = i / sampleRate;
+      if (category === 'dog') {
+        const env = Math.exp(-t * 14) * (1 - Math.exp(-t * 120));
+        const freq = 280 * Math.exp(-t * 8) + 120;
+        data[i] = (Math.sin(2 * Math.PI * freq * t) + (Math.random() * 2 - 1) * 0.35) * env;
+      } else {
+        const env = Math.sin((t / duration) * Math.PI);
+        const freq = 550 + 250 * Math.sin((t / duration) * Math.PI);
+        data[i] = Math.sin(2 * Math.PI * freq * t) * env * 0.7;
+      }
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(masterGainNode);
+    source.start(0);
+  }
+
   function stopAllSounds() {
-    activeAudioNodes.forEach(({ source }) => {
+    audioElements.forEach((audio) => {
       try {
-        source.stop();
-        source.disconnect();
+        audio.pause();
+        audio.currentTime = 0;
       } catch (e) {}
     });
-    activeAudioNodes = [];
+    currentlyPlayingAudio = null;
 
-    // Stop whistle if running
     if (isWhistling) {
       stopWhistle();
     }
 
-    // Reset card UI
     document.querySelectorAll('.sound-card').forEach((c) => c.classList.remove('playing'));
     heroTriggerBtn.classList.remove('playing');
     heroEqBars.style.opacity = '0';
@@ -413,7 +506,6 @@
       heroTriggerBtn.classList.add('cat-mode');
     }
 
-    // Update selected card ring
     document.querySelectorAll('.sound-card').forEach((c) => {
       c.classList.toggle('selected', c.dataset.soundId === sound.id);
     });
@@ -447,7 +539,6 @@
     catsPane.style.display = tab === 'cat' ? 'block' : 'none';
     toolsPane.style.display = tab === 'tools' ? 'block' : 'none';
 
-    // If switching to dogs or cats, pick default if current selection is in other category
     if (tab === 'dog' && selectedSound.category !== 'dog') {
       selectSound(SOUNDS.find((s) => s.category === 'dog'));
     } else if (tab === 'cat' && selectedSound.category !== 'cat') {
@@ -457,39 +548,40 @@
 
   // --- Controls & FX Listeners ---
   function setupControls() {
-    // Volume Slider
     sliderVolume.addEventListener('input', (e) => {
       masterVolume = parseFloat(e.target.value);
       valVolume.textContent = `${Math.round(masterVolume * 100)}%`;
-      if (masterGainNode) {
+      audioElements.forEach((audio) => {
+        audio.volume = masterVolume;
+      });
+      if (masterGainNode && audioCtx) {
         masterGainNode.gain.setValueAtTime(masterVolume, audioCtx.currentTime);
       }
     });
 
-    // Pitch Pills
     pitchPills.addEventListener('click', (e) => {
       const btn = e.target.closest('.pill-opt');
       if (!btn) return;
       document.querySelectorAll('#pitchPills .pill-opt').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       pitchMultiplier = parseFloat(btn.dataset.pitch);
-      triggerHaptic(15);
-    });
-
-    // Loop Toggle
-    toggleLoop.addEventListener('change', (e) => {
-      isLooping = e.target.checked;
-      activeAudioNodes.forEach(({ source }) => {
-        source.loop = isLooping;
+      audioElements.forEach((audio) => {
+        audio.playbackRate = pitchMultiplier;
       });
       triggerHaptic(15);
     });
 
-    // Stop Buttons
+    toggleLoop.addEventListener('change', (e) => {
+      isLooping = e.target.checked;
+      audioElements.forEach((audio) => {
+        audio.loop = isLooping;
+      });
+      triggerHaptic(15);
+    });
+
     btnStopAll.addEventListener('click', stopAllSounds);
     btnQuickStop.addEventListener('click', stopAllSounds);
 
-    // Hero Trigger Pad
     heroTriggerBtn.addEventListener('click', () => {
       playSound(selectedSound);
     });
@@ -497,6 +589,7 @@
 
   // --- Real-time Oscilloscope Canvas ---
   function initVisualizer() {
+    if (!visualizerCanvas || !analyserNode) return;
     const canvas = visualizerCanvas;
     const ctx = canvas.getContext('2d');
     let width = (canvas.width = canvas.parentElement.clientWidth * window.devicePixelRatio || 300);
@@ -514,13 +607,11 @@
 
     function render() {
       requestAnimationFrame(render);
-
       analyserNode.getByteTimeDomainData(dataArray);
 
       ctx.clearRect(0, 0, width, height);
 
-      // Check if sound is actively playing
-      const isSounding = activeAudioNodes.length > 0 || isWhistling;
+      const isSounding = currentlyPlayingAudio !== null || isWhistling;
 
       ctx.lineWidth = 3 * window.devicePixelRatio;
       const isCat = selectedSound.category === 'cat';
@@ -533,7 +624,13 @@
       let x = 0;
 
       for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0;
+        // If an HTML5 audio is playing, synthesize pleasant waveform motion
+        let v = dataArray[i] / 128.0;
+        if (currentlyPlayingAudio && Math.abs(v - 1.0) < 0.02) {
+          const t = performance.now() * 0.01;
+          v = 1.0 + Math.sin(x * 0.05 + t) * 0.25 * Math.sin(x * 0.02 + t * 0.7);
+        }
+
         const y = (v * height) / 2;
 
         if (i === 0) {
@@ -580,7 +677,10 @@
   }
 
   function startWhistle() {
+    unlockAudioEngine();
     const ctx = getAudioContext();
+    if (!ctx) return;
+
     const freq = parseInt(whistleSlider.value, 10);
 
     whistleOsc = ctx.createOscillator();
@@ -628,6 +728,7 @@
     });
 
     btnStartPrank.addEventListener('click', () => {
+      unlockAudioEngine();
       if (prankTimerId) {
         clearInterval(prankTimerId);
         prankTimerId = null;
@@ -654,14 +755,13 @@
           prankCountdownArea.style.display = 'none';
           btnStartPrank.textContent = `ARM TIMER (${prankSeconds}s)`;
           btnStartPrank.style.background = 'var(--primary)';
-          // Trigger selected sound!
           playSound(selectedSound);
         }
       }, 1000);
     });
   }
 
-  // --- Dialog / Modal Management (with light dismiss & ESC support) ---
+  // --- Dialog / Modal Management ---
   function setupModals() {
     const dialogs = [
       { btn: btnOpenWhistle, dialog: whistleModal },
@@ -672,12 +772,12 @@
 
     dialogs.forEach(({ btn, dialog }) => {
       btn.addEventListener('click', () => {
-        getAudioContext(); // Unlock audio on user interaction
+        unlockAudioEngine();
         dialog.showModal();
         triggerHaptic(15);
       });
 
-      // Light dismiss: Close on outside click
+      // Light dismiss
       dialog.addEventListener('click', (e) => {
         const rect = dialog.getBoundingClientRect();
         const isInDialog =
@@ -692,7 +792,6 @@
       });
     });
 
-    // Close buttons inside dialogs
     document.querySelectorAll('.close-dialog').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const dialog = e.target.closest('dialog');
@@ -703,7 +802,6 @@
       });
     });
 
-    // Native Share / Copy Link
     document.getElementById('btnNativeShare').addEventListener('click', async () => {
       const shareData = {
         title: 'Bark — Offline Dog & Cat Soundboard',
@@ -725,9 +823,26 @@
     });
   }
 
+  // --- iOS Silent Switch Tip Banner ---
+  function setupIOSBanner() {
+    if (!iosSilentBanner) return;
+
+    const isDismissed = localStorage.getItem('bark_ios_tip_dismissed') === 'true';
+    if (isIOS && !isDismissed) {
+      iosSilentBanner.style.display = 'flex';
+    }
+
+    const dismissBtn = document.getElementById('dismissIosBanner');
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', () => {
+        iosSilentBanner.style.display = 'none';
+        localStorage.setItem('bark_ios_tip_dismissed', 'true');
+      });
+    }
+  }
+
   // --- Network & PWA Registration ---
   function setupPWA() {
-    // Update online / offline badge
     function updateOnlineStatus() {
       const isOnline = navigator.onLine;
       if (isOnline) {
@@ -741,7 +856,6 @@
     window.addEventListener('offline', updateOnlineStatus);
     updateOnlineStatus();
 
-    // Register Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker
@@ -755,7 +869,6 @@
       });
     }
 
-    // Capture beforeinstallprompt for Android Chrome
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredInstallPrompt = e;
@@ -771,7 +884,6 @@
       }
     });
 
-    // Hash navigation shortcut: #cats -> switch to cats
     if (window.location.hash === '#cats') {
       switchTab('cat');
     }
@@ -779,6 +891,7 @@
 
   // --- Initialization ---
   function init() {
+    initAudioElements();
     renderSoundCards();
     selectSound(SOUNDS[0]);
     setupTabs();
@@ -786,17 +899,8 @@
     setupWhistle();
     setupPrank();
     setupModals();
+    setupIOSBanner();
     setupPWA();
-
-    // Pre-cache primary sound on first touch
-    window.addEventListener(
-      'pointerdown',
-      () => {
-        getAudioContext();
-        loadAudioBuffer(selectedSound);
-      },
-      { once: true }
-    );
   }
 
   if (document.readyState === 'loading') {

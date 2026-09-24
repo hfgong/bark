@@ -209,6 +209,51 @@ body {
 }
 
 /* ==========================================================================
+   iOS Silent Switch Tip Banner
+   ========================================================================== */
+.ios-silent-banner {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-main);
+  line-height: 1.35;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.banner-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.banner-text {
+  flex: 1;
+}
+
+.banner-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  padding: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.banner-close:active {
+  color: var(--text-main);
+}
+
+/* ==========================================================================
    Hero Visualizer & Quick Action Section
    ========================================================================== */
 .hero-card {

@@ -1,6 +1,6 @@
 // sw.js - Bark Service Worker for 100% Offline PWA Experience
 
-const CACHE_NAME = 'bark-v1.0.0';
+const CACHE_NAME = 'bark-v1.0.1';
 
 const PRECACHE_ASSETS = [
   './',
@@ -50,13 +50,61 @@ self.addEventListener('fetch', (event) => {
   // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
+  const url = new URL(event.request.url);
+  const rangeHeader = event.request.headers.get('range');
+
+  // Handle Safari Range requests (HTTP 206 Partial Content) for audio
+  if (rangeHeader && (url.pathname.endsWith('.mp3') || url.pathname.includes('/sounds/'))) {
+    event.respondWith(
+      caches.match(event.request.url, { ignoreSearch: true }).then(async (cachedResponse) => {
+        if (!cachedResponse) {
+          return fetch(event.request);
+        }
+
+        const arrayBuffer = await cachedResponse.arrayBuffer();
+        const total = arrayBuffer.byteLength;
+        const matches = rangeHeader.match(/bytes=(\d+)-(\d+)?/);
+
+        let start = 0;
+        let end = total - 1;
+
+        if (matches) {
+          start = parseInt(matches[1], 10);
+          if (matches[2]) {
+            end = parseInt(matches[2], 10);
+          }
+        }
+
+        if (start >= total || end >= total) {
+          return new Response(null, {
+            status: 416,
+            headers: { 'Content-Range': `bytes */${total}` }
+          });
+        }
+
+        const slicedBuffer = arrayBuffer.slice(start, end + 1);
+        return new Response(slicedBuffer, {
+          status: 206,
+          statusText: 'Partial Content',
+          headers: {
+            'Content-Type': cachedResponse.headers.get('Content-Type') || 'audio/mpeg',
+            'Content-Range': `bytes ${start}-${end}/${total}`,
+            'Content-Length': slicedBuffer.byteLength,
+            'Accept-Ranges': 'bytes'
+          }
+        });
+      })
+    );
+    return;
+  }
+
+  // Standard Cache-First strategy for general assets
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
+    caches.match(event.request, { ignoreSearch: true }).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
       return fetch(event.request).then((networkResponse) => {
-        // Cache newly fetched valid responses
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -65,7 +113,6 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       }).catch(() => {
-        // Offline fallback for navigation requests
         if (event.request.mode === 'navigate') {
           return caches.match('./index.html');
         }
