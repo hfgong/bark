@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#090d16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="100% offline mobile soundboard with realistic dog barks and cat meows. No internet required.">
+  
+  <title>Bark — Offline Dog & Cat Soundboard</title>
+  
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-wrapper">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 5.172a2 2 0 0 0-3.414 0L3.586 10a2 2 0 0 0 0 2.828l3 3A2 2 0 0 0 8 16.414V19a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.586a2 2 0 0 0 .586-1.414l3-3a2 2 0 0 0 0-2.828L16.586 5.172A2 2 0 0 0 13.172 5.172L12 6.344l-1.172-1.172z"/>
+            <path d="M9 13v.01"/>
+            <path d="M15 13v.01"/>
+            <path d="M12 17a2 2 0 0 0 2-2H10a2 2 0 0 0 2 2z"/>
+          </svg>
+        </span>
+        <div class="brand-text">
+          <h1>Bark</h1>
+          <span class="badge" id="networkBadge">
+            <span class="status-dot"></span> Offline Ready
+          </span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Ultrasonic Dog Whistle -->
+        <button id="btnOpenWhistle" class="icon-btn" title="Ultrasonic Dog Whistle" aria-label="Ultrasonic Dog Whistle">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+        </button>
+
+        <!-- Prank / Countdown Timer -->
+        <button id="btnOpenPrank" class="icon-btn" title="Delayed Prank Timer" aria-label="Delayed Prank Timer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </button>
+
+        <!-- Share / Install PWA -->
+        <button id="btnOpenShare" class="icon-btn" title="Share App" aria-label="Share App">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+        </button>
+
+        <!-- About Modal -->
+        <button id="btnOpenAbout" class="icon-btn" title="About Bark" aria-label="About Bark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Hero Card: Real-time Audio Waveform & Instant Trigger -->
+    <section class="hero-card">
+      <div class="hero-header">
+        <div class="hero-title-group">
+          <span class="hero-subtitle">Selected Sound</span>
+          <span id="heroSoundName" class="hero-sound-name">Big Dog Woof</span>
+        </div>
+        <div class="eq-bars" id="heroEqBars">
+          <div class="eq-bar"></div>
+          <div class="eq-bar"></div>
+          <div class="eq-bar"></div>
+        </div>
+      </div>
+
+      <!-- Real-time Oscilloscope Waveform Canvas -->
+      <div class="canvas-container">
+        <canvas id="visualizerCanvas"></canvas>
+      </div>
+
+      <!-- Primary Big Touch Pad -->
+      <button id="heroTriggerBtn" class="hero-pad" aria-label="Trigger Sound">
+        <span class="pad-icon" id="heroPadIcon">🐕</span>
+        <span id="heroPadText">TAP TO BARK</span>
+      </button>
+    </section>
+
+    <!-- Navigation Tabs: Dogs / Cats / Settings -->
+    <nav class="tabs-container" role="tablist">
+      <button id="tabDogs" class="tab-btn active dog-tab" role="tab" aria-selected="true">
+        <span>🐶 Dogs</span>
+      </button>
+      <button id="tabCats" class="tab-btn cat-tab" role="tab" aria-selected="false">
+        <span>🐱 Cats</span>
+      </button>
+      <button id="tabTools" class="tab-btn tools-tab" role="tab" aria-selected="false">
+        <span>🎛️ Controls</span>
+      </button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main>
+      <!-- Dogs Tab Pane -->
+      <div id="dogsPane" class="tab-pane">
+        <div class="sounds-grid" id="dogsGrid">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+
+      <!-- Cats Tab Pane (hidden by default) -->
+      <div id="catsPane" class="tab-pane" style="display: none;">
+        <div class="sounds-grid" id="catsGrid">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+
+      <!-- Controls & FX Pane (hidden by default) -->
+      <div id="toolsPane" class="tab-pane" style="display: none;">
+        <div class="controls-panel">
+          <!-- Volume Slider -->
+          <div class="control-row">
+            <span class="control-label">🔊 Master Volume</span>
+            <span class="control-value" id="valVolume">100%</span>
+          </div>
+          <input type="range" id="sliderVolume" class="range-slider" min="0" max="1" step="0.05" value="1">
+
+          <!-- Pitch Shifter -->
+          <div class="control-row" style="margin-top: 6px;">
+            <span class="control-label">🎵 Vocal Pitch</span>
+            <div class="pill-group" id="pitchPills">
+              <button class="pill-opt" data-pitch="0.75">Deep</button>
+              <button class="pill-opt active" data-pitch="1.0">Normal</button>
+              <button class="pill-opt" data-pitch="1.3">High</button>
+            </div>
+          </div>
+
+          <!-- Loop Mode -->
+          <div class="control-row" style="margin-top: 6px;">
+            <span class="control-label">🔁 Continuous Loop</span>
+            <label class="switch">
+              <input type="checkbox" id="toggleLoop">
+              <span class="slider-switch"></span>
+            </label>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="bottom-actions" style="margin-top: 10px;">
+            <button id="btnStopAll" class="action-btn btn-stop">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+              </svg>
+              <span>Stop Audio</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bottom Quick Stop Float Bar -->
+    <div class="bottom-actions" id="quickStopBar">
+      <button id="btnQuickStop" class="action-btn btn-stop">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+        </svg>
+        <span>Silence / Stop All</span>
+      </button>
+    </div>
+
+    <!-- ==========================================================================
+         Modals (<dialog> elements)
+         ========================================================================== -->
+
+    <!-- 1. Ultrasonic Dog Whistle Modal -->
+    <dialog id="whistleModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">🔊 Ultrasonic Dog Whistle</h2>
+          <button class="icon-btn close-dialog" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Dogs can hear up to <strong>45,000 Hz</strong>, while humans rarely hear above 16,000–18,000 Hz. Adjust the frequency for training or pet attention.</p>
+          <div class="whistle-display">
+            <div class="whistle-freq" id="whistleFreqDisplay">16,000 Hz</div>
+            <div class="whistle-note" id="whistleAudibility">Near human hearing threshold (Youth / Pets)</div>
+          </div>
+          <input type="range" id="whistleSlider" class="range-slider" min="12000" max="22000" step="250" value="16000">
+        </div>
+        <div class="modal-footer">
+          <button id="btnWhistleToggle" class="btn-primary" style="width: 100%;">START WHISTLE</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- 2. Delayed Prank Timer Modal -->
+    <dialog id="prankModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">⏱️ Delayed Sound Surprise</h2>
+          <button class="icon-btn close-dialog" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Set a countdown timer, place your phone across the room, and surprise your pet or friends with an unexpected bark or meow!</p>
+          
+          <div class="prank-presets">
+            <button class="btn-prank-time selected" data-sec="3">3s</button>
+            <button class="btn-prank-time" data-sec="5">5s</button>
+            <button class="btn-prank-time" data-sec="10">10s</button>
+            <button class="btn-prank-time" data-sec="30">30s</button>
+          </div>
+
+          <div id="prankCountdownArea" style="display: none;">
+            <div class="countdown-badge" id="prankCountdown">Starting in 3...</div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btnStartPrank" class="btn-primary" style="width: 100%;">ARM TIMER (3s)</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- 3. Share & Install PWA Modal -->
+    <dialog id="shareModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">📱 Share & Install Bark</h2>
+          <button class="icon-btn close-dialog" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Bark is a zero-network PWA. You can install it directly to your home screen or share it with other phones.</p>
+          <ul>
+            <li><strong>iPhone (Safari):</strong> Tap the <em>Share</em> button (box with arrow) → <em>"Add to Home Screen"</em>.</li>
+            <li><strong>Android (Chrome):</strong> Tap the <em>Three dots (⋮)</em> → <em>"Install app"</em> or <em>"Add to Home screen"</em>.</li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button id="btnNativeShare" class="btn-primary">Share Link</button>
+          <button class="btn-secondary close-dialog">Close</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- 4. About & Licenses Modal -->
+    <dialog id="aboutModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">ℹ️ About Bark</h2>
+          <button class="icon-btn close-dialog" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-body">
+          <p><strong>Bark</strong> is a 100% client-side, zero-dependency audio soundboard designed specifically for smartphones.</p>
+          <p><strong>Features:</strong></p>
+          <ul>
+            <li>✈️ <strong>100% Offline:</strong> Pre-caches all 16 dog and cat sounds via Service Worker. Works completely in Airplane Mode.</li>
+            <li>🔊 <strong>Instant Touch:</strong> Leading silence removed using acoustic RMS detection for zero-latency response.</li>
+            <li>🎵 <strong>Pitch & Loop Control:</strong> Modulate vocal tones and loop soothing purrs or guard alerts.</li>
+            <li>🐕 <strong>Dog Whistle & Prank Timer:</strong> Built-in ultrasonic generator and delayed surprise triggers.</li>
+          </ul>
+          <p style="font-size: 0.78rem; color: var(--text-dim); margin-top: 6px;">
+            Audio recordings sourced from the ESC-50 Environmental Sound Classification dataset and Wikimedia Commons under Creative Commons (CC-BY / CC0 / Public Domain).
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary close-dialog">Done</button>
+        </div>
+      </div>
+    </dialog>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

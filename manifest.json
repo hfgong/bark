@@ -1,0 +1,39 @@
+{
+  "name": "Bark — Offline Dog & Cat Soundboard",
+  "short_name": "Bark",
+  "description": "Mobile soundboard with authentic dog barks and cat meows. Runs 100% offline without internet connection.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dog Bark",
+      "short_name": "Dogs",
+      "description": "Quick Dog Bark sounds",
+      "url": "./#dogs"
+    },
+    {
+      "name": "Cat Meow",
+      "short_name": "Cats",
+      "description": "Quick Cat Meow sounds",
+      "url": "./#cats"
+    }
+  ]
+}
