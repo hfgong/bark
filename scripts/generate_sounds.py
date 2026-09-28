@@ -2,317 +2,221 @@
 """
 scripts/generate_sounds.py
 
-Offline audio preparation and generation script for Bark PWA.
-Fetches high-quality animal vocalizations from open public datasets (ESC-50 / Wikimedia Commons),
-performs automated acoustic processing (RMS-based silence trimming, peak/LUFS normalization,
-and click-free envelope fading), and exports highly optimized MP3 assets to sounds/.
+Builds the Bark sound bank: one short file per bark / meow, so that one tap plays exactly
+one vocalization. Several takes of the same animal are kept as variants; the app picks one
+at random per tap so repeated taps sound natural.
 
-All source recordings are licensed under Creative Commons (CC-BY / CC0 / Public Domain).
+Pipeline (requires numpy + scipy, no ffmpeg):
+  1. Download the source clips from the ESC-50 dataset (only clips whose individual licence
+     is CC0 or CC-BY, as listed in ESC-50's LICENSE file).
+  2. Detect each vocalization by RMS energy (10 ms frames) and cut it out with a short
+     pre-roll and its natural decay tail, never running into the next one.
+  3. Drop faint, distant or clipped takes.
+  4. High-pass filter (removes rumble/handling noise), match loudness across all sounds and
+     cap peaks at -1 dBFS (no limiter, so no distortion), 3 ms fade-in / 40 ms fade-out.
+  5. Write 16-bit mono WAV (no codec delay, so playback starts instantly) plus
+     sounds/sounds.json, which the app reads.
+
+Sounds listed in KEPT are existing files that are not regenerated here.
 """
 
-import os
-import sys
-import math
-import struct
-import subprocess
+import json
 import urllib.request
-import ssl
 from pathlib import Path
 
-# Allow unverified HTTPS context for local script execution on macOS
-ssl._create_default_https_context = ssl._create_unverified_context
+import numpy as np
+from scipy.io import wavfile
+from scipy.signal import butter, resample_poly, sosfiltfilt
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 SOUNDS_DIR = BASE_DIR / "sounds"
 CACHE_DIR = BASE_DIR / ".audio_cache"
+ESC50 = "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/"
 
-ESC50_BASE = "https://raw.githubusercontent.com/karolpiczak/ESC-50/master/audio/"
+FRAME = 0.01          # analysis frame, seconds
+TARGET_RMS_DB = -17   # loudness of the active part of each take
+PEAK_CEILING_DB = -1
+OUT_RATE = 32000       # keeps everything up to 16 kHz; ~30% smaller than 44.1 kHz
 
-SOUND_CATALOG = {
-    # Dog sounds (8 diverse breeds & vocalization types)
-    "dog_big_bark": {
-        "title": "Big Dog Woof",
-        "category": "dog",
-        "icon": "🐕",
-        "description": "Deep resonant bark of a large breed (German Shepherd / Mastiff)",
-        "url": ESC50_BASE + "1-100032-A-0.wav",
-        "author": "nfrae (Freesound #100032)",
-        "license": "CC-BY 3.0",
-        "max_dur": 2.2,
-        "energy_mult": 0.08,
-    },
-    "dog_guard_barks": {
-        "title": "Guard Dog Warning",
-        "category": "dog",
-        "icon": "🚨",
-        "description": "Fierce repeated alert barks guarding territory",
-        "url": ESC50_BASE + "2-114587-A-0.wav",
-        "author": "InDaHouse20 (Freesound #114587)",
-        "license": "CC0",
-        "max_dur": 2.5,
-        "energy_mult": 0.08,
-    },
-    "dog_angry": {
-        "title": "Angry Snarl & Bark",
-        "category": "dog",
-        "icon": "⚡",
-        "description": "Aggressive low growl transitioning into defensive barks",
-        "url": ESC50_BASE + "2-117271-A-0.wav",
-        "author": "polipa (Freesound #117271)",
-        "license": "CC-BY-NC 3.0",
-        "max_dur": 2.8,
-        "energy_mult": 0.08,
-    },
-    "dog_small_poodle": {
-        "title": "Toy Poodle Yip",
-        "category": "dog",
-        "icon": "🐩",
-        "description": "Sharp, bright high-pitched bark of a toy poodle",
-        "url": ESC50_BASE + "3-170015-A-0.wav",
-        "author": "fabiopx (Freesound #170015)",
-        "license": "CC0",
-        "max_dur": 1.8,
-        "energy_mult": 0.08,
-    },
-    "dog_dachshund": {
-        "title": "Mini Dachshund",
-        "category": "dog",
-        "icon": "🐶",
-        "description": "Lively, eager indoor barks from a curious wiener dog",
-        "url": ESC50_BASE + "4-192236-A-0.wav",
-        "author": "Ligidium (Freesound #192236)",
-        "license": "CC-BY 3.0",
-        "max_dur": 2.2,
-        "energy_mult": 0.08,
-    },
-    "dog_alert": {
-        "title": "Fast Alarm Barks",
-        "category": "dog",
-        "icon": "🔔",
-        "description": "Rapid staccato barking signaling visitors at the door",
-        "url": ESC50_BASE + "3-163459-A-0.wav",
-        "author": "LittleBigSounds (Freesound #163459)",
-        "license": "CC-BY 3.0",
-        "max_dur": 2.2,
-        "energy_mult": 0.08,
-    },
-    "dog_playful": {
-        "title": "Playful Woof",
-        "category": "dog",
-        "icon": "🎾",
-        "description": "Friendly, tail-wagging happy bark ready for fetch",
-        "url": ESC50_BASE + "1-30226-A-0.wav",
-        "author": "Heigh-hoo (Freesound #30226)",
-        "license": "CC-BY-NC 3.0",
-        "max_dur": 2.2,
-        "energy_mult": 0.08,
-    },
-    "dog_wolf_howl": {
-        "title": "Husky / Wolf Howl",
-        "category": "dog",
-        "icon": "🐺",
-        "description": "Majestic, soul-stirring wild canine howl",
-        "url": "https://upload.wikimedia.org/wikipedia/commons/8/87/Wolf_howls.ogg",
-        "author": "U.S. Fish and Wildlife Service / Wikimedia Commons",
-        "license": "Public Domain",
-        "max_dur": 3.5,
-        "energy_mult": 0.05,
-    },
+# Each entry: sources (ESC-50 files), credit (from ESC-50's LICENSE), and selection limits.
+CATALOG = [
+    # ---- Dogs ----
+    dict(id="big_dog", category="dog", icon="🐕", title="Big Dog", desc="Deep single woof",
+         sources=["4-182395-A-0.wav"],
+         credit="Big_dog_bark_01.aiff by pgonsilva (freesound.org/s/182395), CC BY"),
+    dict(id="guard_dog", category="dog", icon="🚨", title="Guard Dog", desc="Firm warning bark",
+         sources=["4-191687-A-0.wav"],
+         credit="Dog Barks.wav by UnderlinedDesigns (freesound.org/s/191687), CC0"),
+    dict(id="spaniel", category="dog", icon="🦮", title="Springer Spaniel", desc="Bright, eager bark",
+         sources=["1-110389-A-0.wav"],
+         credit="animals_dog_bark_springer_spaniel_001.wav by soundscalpel.com (freesound.org/s/110389), CC BY"),
+    dict(id="shih_tzu", category="dog", icon="🐶", title="Shih Tzu Pug", desc="Bark with a howly tail",
+         sources=["3-180256-A-0.wav"], max_dur=1.0,
+         credit="Dog Barking - Shih Tzu Pug by bspiller5 (freesound.org/s/180256), CC BY"),
+    dict(id="dachshund", category="dog", icon="🌭", title="Mini Dachshund", desc="Lively indoor bark",
+         sources=["4-192236-A-0.wav"],
+         credit="Miniature Dachshund Bark - Indoors.wav by Ligidium (freesound.org/s/192236), CC0"),
+    dict(id="poodle", category="dog", icon="🐩", title="Poodle", desc="Single sharp bark",
+         sources=["3-170015-A-0.wav"],
+         credit="one bark of a poodle dog by fabiopx (freesound.org/s/170015), CC0"),
+    dict(id="yappy_pup", category="dog", icon="🐾", title="Yappy Pup", desc="High, snappy yip",
+         sources=["5-9032-A-0.wav"],
+         credit="Dog bark2.wav by MisterTood (freesound.org/s/9032), CC0"),
+    # ---- Cats ----
+    dict(id="classic_meow", category="cat", icon="🐱", title="Classic Meow", desc="Friendly meow",
+         sources=["5-214759-A-5.wav", "5-214759-B-5.wav"], max_dur=1.3,
+         credit="Cat meowing x5 by peridactyloptrix (freesound.org/s/214759), CC0"),
+    dict(id="loud_meow", category="cat", icon="📢", title="Loud Meow", desc="Insistent, attention-seeking",
+         sources=["5-172639-A-5.wav"], max_dur=1.0,
+         credit="Cat.mp3 by telesik (freesound.org/s/172639), CC BY"),
+    dict(id="hungry_cat", category="cat", icon="🥣", title="Hungry Cat", desc="Dinner-time demand",
+         sources=["3-95695-A-5.wav", "3-95698-A-5.wav"], max_dur=1.2,
+         credit="20100423.hungry.cats.02.wav / .05.wav by dobroide (freesound.org/s/95695, /95698), CC BY"),
+    dict(id="soft_meow", category="cat", icon="🌙", title="Soft Meow", desc="Gentle, quiet mew",
+         sources=["2-82274-A-5.wav", "2-82274-B-5.wav"], max_dur=1.2,
+         credit="garage cat 01.wav by Kyster (freesound.org/s/82274), CC BY"),
+    dict(id="little_mew", category="cat", icon="🍼", title="Little Mew", desc="Small, high mew",
+         sources=["3-95697-A-5.wav"], max_dur=1.0,
+         credit="20100423.hungry.cats.04.wav by dobroide (freesound.org/s/95697), CC BY"),
+    dict(id="mad_cat", category="cat", icon="😾", title="Mad Cat Yowl", desc="Long, grumpy yowl",
+         sources=["4-133047-C-5.wav"], max_dur=1.6,
+         credit="MAD CAT !.wav by temawas (freesound.org/s/133047), CC0"),
+]
 
-    # Cat sounds (8 distinct feline vocalizations)
-    "cat_classic_meow": {
-        "title": "Classic Meow",
-        "category": "cat",
-        "icon": "🐱",
-        "description": "Standard friendly household meow greeting humans",
-        "url": ESC50_BASE + "1-34094-A-5.wav",
-        "author": "sazman (Freesound #34094)",
-        "license": "CC-BY 3.0",
-        "max_dur": 2.0,
-        "energy_mult": 0.08,
-    },
-    "cat_kitten_squeak": {
-        "title": "Tiny Kitten Squeak",
-        "category": "cat",
-        "icon": "🍼",
-        "description": "Sweet, high-pitched newborn kitten squeak",
-        "url": ESC50_BASE + "1-47819-A-5.wav",
-        "author": "YuriVoorhak (Freesound #47819)",
-        "license": "CC-BY 3.0",
-        "max_dur": 1.6,
-        "energy_mult": 0.08,
-    },
-    "cat_gentle_purr": {
-        "title": "Soothing Purr",
-        "category": "cat",
-        "icon": "💤",
-        "description": "Deep continuous rhythmic vibration of a relaxed cat",
-        "url": "https://upload.wikimedia.org/wikipedia/commons/d/db/Purring_cat.oga",
-        "author": "Mysid (Wikimedia Commons)",
-        "license": "Public Domain",
-        "max_dur": 3.8,
-        "energy_mult": 0.02,
-    },
-    "cat_angry_hiss": {
-        "title": "Defensive Hiss",
-        "category": "cat",
-        "icon": "😾",
-        "description": "Sharp air release and warning spit from a startled cat",
-        "url": "https://upload.wikimedia.org/wikipedia/commons/5/56/Cat_hissing_-_Zabuhailo.wav",
-        "author": "Zabuhailo (Wikimedia Commons)",
-        "license": "CC-BY 3.0",
-        "max_dur": 2.2,
-        "energy_mult": 0.05,
-    },
-    "cat_hungry_demand": {
-        "title": "Hungry Demanding",
-        "category": "cat",
-        "icon": "🥣",
-        "description": "Urgent, persistent dinner-time meow for wet food",
-        "url": ESC50_BASE + "3-95694-A-5.wav",
-        "author": "dobroide (Freesound #95694)",
-        "license": "CC-BY 3.0",
-        "max_dur": 2.4,
-        "energy_mult": 0.08,
-    },
-    "cat_chirp_trill": {
-        "title": "Bird-Watcher Chirp",
-        "category": "cat",
-        "icon": "🐦",
-        "description": "Excited chattering and trilling at birds out the window",
-        "url": ESC50_BASE + "5-177614-A-5.wav",
-        "author": "aminut (Freesound #177614)",
-        "license": "CC-BY 3.0",
-        "max_dur": 2.2,
-        "energy_mult": 0.06,
-    },
-    "cat_dramatic_yowl": {
-        "title": "Dramatic Yowl",
-        "category": "cat",
-        "icon": "🌙",
-        "description": "Loud, long-distance night song / alley caterwaul",
-        "url": ESC50_BASE + "3-146964-A-5.wav",
-        "author": "Zabuhailo (Freesound #146964)",
-        "license": "CC-BY 3.0",
-        "max_dur": 3.2,
-        "energy_mult": 0.06,
-    },
-    "cat_door_greeting": {
-        "title": "Doorstep Meow",
-        "category": "cat",
-        "icon": "🚪",
-        "description": "Polite greeting meow asking to open the bedroom door",
-        "url": ESC50_BASE + "1-47819-B-5.wav",
-        "author": "YuriVoorhak (Freesound #47819)",
-        "license": "CC-BY 3.0",
-        "max_dur": 2.0,
-        "energy_mult": 0.08,
-    }
-}
+# Existing files kept as-is (not produced by this script); see README for their sources.
+KEPT = [
+    dict(id="wolf_howl", category="dog", icon="🐺", title="Wolf Howl", desc="Long wild howl",
+         files=["sounds/dog_wolf_howl.mp3"],
+         credit="Wolf howls, U.S. Fish and Wildlife Service via Wikimedia Commons (public domain)"),
+    dict(id="purr", category="cat", icon="💤", title="Purr", desc="Relaxed purring",
+         files=["sounds/cat_gentle_purr.mp3"],
+         credit="Purring cat by Mysid via Wikimedia Commons (public domain)"),
+    dict(id="hiss", category="cat", icon="😼", title="Hiss", desc="Warning hiss",
+         files=["sounds/cat_angry_hiss.mp3"],
+         credit="Cat hissing by Zabuhailo via Wikimedia Commons (CC BY 3.0)"),
+]
 
-def detect_start_time(raw_audio_path, energy_mult=0.08):
-    """
-    Decodes audio to mono 16-bit PCM and finds the precise onset of vocalization
-    to eliminate leading silence.
-    """
-    cmd = [
-        "ffmpeg", "-y", "-i", str(raw_audio_path),
-        "-ar", "22050", "-ac", "1", "-f", "s16le", "-"
-    ]
-    try:
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True)
-        raw_pcm = proc.stdout
-    except Exception as e:
-        print(f"  [!] Failed to decode {raw_audio_path}: {e}")
-        return 0.0
+DEFAULTS = dict(dog=dict(min_dur=0.08, max_dur=0.7, max_variants=4),
+                cat=dict(min_dur=0.25, max_dur=1.2, max_variants=4))
 
-    samples = struct.unpack(f"<{len(raw_pcm) // 2}h", raw_pcm)
-    if not samples:
-        return 0.0
 
-    step = 220  # 10ms at 22.05kHz
-    rms_list = []
-    for i in range(0, len(samples), step):
-        chunk = samples[i:i + step]
-        if not chunk:
+def load(name):
+    CACHE_DIR.mkdir(exist_ok=True)
+    path = CACHE_DIR / name
+    if not path.exists():
+        print(f"    downloading {name}")
+        with urllib.request.urlopen(ESC50 + name) as resp:
+            path.write_bytes(resp.read())
+    sr, x = wavfile.read(path)
+    x = x.astype(np.float32) / 32768
+    if x.ndim > 1:
+        x = x.mean(axis=1)
+    return sr, x
+
+
+def frame_db(x, hop):
+    n = len(x) // hop
+    rms = np.sqrt((x[: n * hop].reshape(n, hop) ** 2).mean(axis=1))
+    return 20 * np.log10(rms + 1e-9)
+
+
+def find_takes(sr, x, min_dur, max_dur):
+    """Returns (start, end, peak_db) sample ranges of individual vocalizations."""
+    hop = int(sr * FRAME)
+    db = frame_db(x, hop)
+    audible = db[db > -120]  # ignore digital silence padding
+    floor = np.percentile(audible, 15)
+    threshold = max(floor + 15, db.max() - 24)
+    on = db > threshold
+
+    # Group frames into events, bridging gaps shorter than 40 ms.
+    events, i, n = [], 0, len(db)
+    while i < n:
+        if not on[i]:
+            i += 1
             continue
-        rms = math.sqrt(sum(s * s for s in chunk) / len(chunk))
-        rms_list.append(rms)
+        j = i
+        while j < n and on[j:j + 5].any():
+            j += 1
+        events.append([i, j])
+        i = j
 
-    if not rms_list:
-        return 0.0
+    takes = []
+    for k, (a, b) in enumerate(events):
+        peak = db[a:b].max()
+        # Extend to the natural decay: until 40 dB below the peak or near the noise floor,
+        # but stop 20 ms before the next event.
+        limit = events[k + 1][0] - 2 if k + 1 < len(events) else n
+        end = b
+        while end < limit and db[end] > max(peak - 40, floor + 6):
+            end += 1
+        start = max(0, a - 2)  # 20 ms pre-roll keeps the attack
+        end = min(end, start + int(max_dur / FRAME))
+        dur = (end - start) * FRAME
+        seg = x[start * hop:end * hop]
+        if dur < min_dur or np.abs(seg).max() > 0.98:  # too short, or clipped
+            continue
+        takes.append((start * hop, end * hop, peak))
+    return takes
 
-    max_rms = max(rms_list)
-    thresh = max(max_rms * energy_mult, 250)
 
-    for idx, r in enumerate(rms_list):
-        if r > thresh:
-            # 40ms pre-roll to preserve consonant attack
-            onset_idx = max(0, idx - 4)
-            return onset_idx * 0.01
+def finish(sr, seg):
+    """Resample, high-pass, loudness match with a peak ceiling, and click-free fades."""
+    if sr != OUT_RATE:
+        g = np.gcd(sr, OUT_RATE)
+        seg, sr = resample_poly(seg, OUT_RATE // g, sr // g), OUT_RATE
+    sos = butter(2, 70, btype="highpass", fs=sr, output="sos")
+    seg = sosfiltfilt(sos, seg)
+    hop = int(sr * FRAME)
+    db = frame_db(seg, hop)
+    active = db > db.max() - 20
+    rms_db = 10 * np.log10(np.mean(10 ** (db[active] / 10)))
+    peak_db = 20 * np.log10(np.abs(seg).max() + 1e-9)
+    gain_db = min(TARGET_RMS_DB - rms_db, PEAK_CEILING_DB - peak_db)
+    seg = seg * 10 ** (gain_db / 20)
+    fade_in, fade_out = int(sr * 0.003), int(sr * 0.04)
+    seg[:fade_in] *= np.linspace(0, 1, fade_in)
+    seg[-fade_out:] *= np.cos(np.linspace(0, np.pi / 2, fade_out)) ** 2
+    return (np.clip(seg, -1, 1) * 32767).astype(np.int16)
 
-    return 0.0
 
-def process_sound(sound_key, info):
-    SOUNDS_DIR.mkdir(parents=True, exist_ok=True)
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+def build(entry):
+    opts = {**DEFAULTS[entry["category"]], **entry}
+    takes = []  # (recording order, peak_db, sample rate, samples)
+    for name in entry["sources"]:
+        sr, x = load(name)
+        for start, end, peak in find_takes(sr, x, opts["min_dur"], opts["max_dur"]):
+            takes.append((len(takes), peak, sr, x[start:end]))
+    if not takes:
+        raise RuntimeError(f"no usable takes for {entry['id']}")
+    # Keep the strongest takes (drops faint / distant ones), in recording order.
+    loudest = max(t[1] for t in takes)
+    takes = [t for t in takes if t[1] > loudest - 10]
+    takes = sorted(sorted(takes, key=lambda t: -t[1])[: opts["max_variants"]])
+    files = []
+    for n, (_, _, sr, seg) in enumerate(takes, 1):
+        rel = f"sounds/{entry['id']}_{n}.wav"
+        wavfile.write(BASE_DIR / rel, OUT_RATE, finish(sr, seg))
+        files.append(rel)
+        print(f"    {rel}: {len(seg) / sr:.2f}s")
+    return files
 
-    dest_mp3 = SOUNDS_DIR / f"{sound_key}.mp3"
-    ext = info["url"].split(".")[-1].split("?")[0]
-    cached_raw = CACHE_DIR / f"{sound_key}_raw.{ext}"
-
-    print(f"[*] Processing '{info['title']}' ({sound_key})...")
-
-    # Step 1: Download raw source if not in cache
-    if not cached_raw.exists():
-        print(f"    Downloading from {info['url'][:65]}...")
-        req = urllib.request.Request(info["url"], headers={"User-Agent": "Mozilla/5.0 (BarkApp; OfflinePrep)"})
-        with urllib.request.urlopen(req) as resp, open(cached_raw, "wb") as f:
-            f.write(resp.read())
-
-    # Step 2: Detect start offset to eliminate leading silence
-    start_sec = detect_start_time(cached_raw, info.get("energy_mult", 0.08))
-    duration = info.get("max_dur", 2.5)
-
-    # Step 3: Trim, fade, normalize, and encode to 96kbps MP3
-    fade_out_start = max(0.1, duration - 0.2)
-    af_filter = (
-        f"afade=t=in:ss=0:d=0.03,"
-        f"afade=t=out:st={fade_out_start:.2f}:d=0.20,"
-        f"loudnorm=I=-16:TP=-1.5:LRA=11"
-    )
-
-    cmd = [
-        "ffmpeg", "-y",
-        "-ss", f"{start_sec:.2f}",
-        "-i", str(cached_raw),
-        "-t", f"{duration:.2f}",
-        "-af", af_filter,
-        "-codec:a", "libmp3lame",
-        "-b:a", "96k",
-        "-ar", "44100",
-        str(dest_mp3)
-    ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-
-    size_kb = dest_mp3.stat().st_size / 1024
-    print(f"    -> Generated {dest_mp3.name} ({size_kb:.1f} KB, onset: {start_sec:.2f}s)")
 
 def main():
-    print("==================================================")
-    print("  Bark: Offline Audio Asset Generation Pipeline   ")
-    print("==================================================")
-    for key, info in SOUND_CATALOG.items():
-        try:
-            process_sound(key, info)
-        except Exception as e:
-            print(f"  [ERROR] Failed to process {key}: {e}")
+    SOUNDS_DIR.mkdir(exist_ok=True)
+    for old in SOUNDS_DIR.glob("*.wav"):
+        old.unlink()
+    bank = []
+    for entry in CATALOG:
+        print(f"[*] {entry['title']}")
+        files = build(entry)
+        bank.append({k: entry[k] for k in ("id", "category", "icon", "title", "desc", "credit")} | {"files": files})
+    bank += [dict(entry) for entry in KEPT]
+    bank.sort(key=lambda s: s["category"] != "dog")  # dogs first, stable otherwise
+    (SOUNDS_DIR / "sounds.json").write_text(json.dumps(bank, ensure_ascii=False, indent=1) + "\n")
+    size = sum(f.stat().st_size for f in SOUNDS_DIR.glob("*.wav"))
+    print(f"Wrote {sum(len(s['files']) for s in bank)} files; generated WAVs total {size / 1024:.0f} KB")
 
-    total_size = sum(f.stat().st_size for f in SOUNDS_DIR.glob("*.mp3"))
-    print("==================================================")
-    print(f"Successfully generated all {len(SOUND_CATALOG)} sound files!")
-    print(f"Total bundle size: {total_size / 1024:.1f} KB (Avg: {total_size / len(SOUND_CATALOG) / 1024:.1f} KB/sound)")
-    print("Files ready in:", SOUNDS_DIR)
 
 if __name__ == "__main__":
     main()

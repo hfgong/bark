@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#090d16">
+  <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#090d16" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="description" content="100% offline mobile soundboard with realistic dog barks and cat meows. No internet required.">
@@ -12,7 +13,8 @@
   
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,14 +22,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="brand">
-        <span class="brand-icon" aria-hidden="true">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10 5.172a2 2 0 0 0-3.414 0L3.586 10a2 2 0 0 0 0 2.828l3 3A2 2 0 0 0 8 16.414V19a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.586a2 2 0 0 0 .586-1.414l3-3a2 2 0 0 0 0-2.828L16.586 5.172A2 2 0 0 0 13.172 5.172L12 6.344l-1.172-1.172z"/>
-            <path d="M9 13v.01"/>
-            <path d="M15 13v.01"/>
-            <path d="M12 17a2 2 0 0 0 2-2H10a2 2 0 0 0 2 2z"/>
-          </svg>
-        </span>
+        <img class="brand-logo" src="icon.svg" alt="" width="26" height="26">
         <div class="brand-text">
           <h1>Bark</h1>
           <span class="badge" id="networkBadge">
@@ -89,38 +84,6 @@
       <button class="banner-close" id="dismissIosBanner" aria-label="Dismiss">✕</button>
     </div>
 
-    <!-- Hero Card: Real-time Audio Waveform & Instant Trigger -->
-    <section class="hero-card">
-      <div class="hero-header">
-        <div class="hero-title-group">
-          <span class="hero-subtitle">Selected Sound</span>
-          <span id="heroSoundName" class="hero-sound-name">Big Dog Woof</span>
-        </div>
-        <div class="eq-bars" id="heroEqBars">
-          <div class="eq-bar"></div>
-          <div class="eq-bar"></div>
-          <div class="eq-bar"></div>
-        </div>
-      </div>
-
-      <!-- Real-time Oscilloscope Waveform Canvas -->
-      <div class="canvas-container">
-        <canvas id="visualizerCanvas"></canvas>
-      </div>
-
-      <!-- Primary Big Touch Pad -->
-      <button id="heroTriggerBtn" class="hero-pad" aria-label="Trigger Sound">
-        <span class="pad-icon" id="heroPadIcon">🐕</span>
-        <span id="heroPadText">TAP TO BARK</span>
-      </button>
-
-      <!-- Quick Audible Debug Sound Button -->
-      <button id="btnQuickDebugSound" class="quick-debug-btn" type="button">
-        <span>🧪 Play Audible Debug Sound (440Hz Beep)</span>
-      </button>
-      <div id="debugStatusToast" class="debug-status-toast" style="display: none;"></div>
-    </section>
-
     <!-- Navigation Tabs: Dogs / Cats / Settings -->
     <nav class="tabs-container" role="tablist">
       <button id="tabDogs" class="tab-btn active dog-tab" role="tab" aria-selected="true">
@@ -136,6 +99,8 @@
 
     <!-- Main Content Area -->
     <main>
+      <p class="tap-hint">One tap = one bark. Tap again for the next one.</p>
+
       <!-- Dogs Tab Pane -->
       <div id="dogsPane" class="tab-pane">
         <div class="sounds-grid" id="dogsGrid">
@@ -168,15 +133,6 @@
               <button class="pill-opt active" data-pitch="1.0">Normal</button>
               <button class="pill-opt" data-pitch="1.3">High</button>
             </div>
-          </div>
-
-          <!-- Loop Mode -->
-          <div class="control-row" style="margin-top: 6px;">
-            <span class="control-label">🔁 Continuous Loop</span>
-            <label class="switch">
-              <input type="checkbox" id="toggleLoop">
-              <span class="slider-switch"></span>
-            </label>
           </div>
 
           <!-- Quick Action Buttons -->
@@ -257,7 +213,7 @@
               🔔 Test 2: 880 Hz Harmonic Chime
             </button>
             <button id="btnDiagMp3" class="btn-primary" style="background: #d97706; width: 100%;">
-              🐕 Test 3: MP3 Test File (Big Dog Woof)
+              🐕 Test 3: MP3 Test File (440 Hz Beep)
             </button>
           </div>
 
@@ -343,14 +299,16 @@
           <p><strong>Bark</strong> is a 100% client-side, zero-dependency audio soundboard designed specifically for smartphones.</p>
           <p><strong>Features:</strong></p>
           <ul>
-            <li>✈️ <strong>100% Offline:</strong> Pre-caches all 16 dog and cat sounds via Service Worker. Works completely in Airplane Mode.</li>
-            <li>🔊 <strong>Instant Touch:</strong> Leading silence removed using acoustic RMS detection for zero-latency response.</li>
-            <li>🎵 <strong>Pitch & Loop Control:</strong> Modulate vocal tones and loop soothing purrs or guard alerts.</li>
+            <li>✈️ <strong>100% Offline:</strong> All dog and cat sounds are cached by a Service Worker. Works in Airplane Mode.</li>
+            <li>👆 <strong>One tap, one bark:</strong> Every sound is a single, trimmed bark or meow that starts instantly; quick taps overlap naturally and rotate through several takes of the same animal.</li>
+            <li>🎵 <strong>Pitch Control:</strong> Deep / Normal / High shifts the voice like a bigger or smaller animal.</li>
             <li>🐕 <strong>Dog Whistle & Prank Timer:</strong> Built-in ultrasonic generator and delayed surprise triggers.</li>
           </ul>
-          <p style="font-size: 0.78rem; color: var(--text-dim); margin-top: 6px;">
-            Audio recordings sourced from the ESC-50 Environmental Sound Classification dataset and Wikimedia Commons under Creative Commons (CC-BY / CC0 / Public Domain).
-          </p>
+          <details class="credits">
+            <summary>Sound credits &amp; licenses</summary>
+            <p>Recordings from the <a href="https://github.com/karolpiczak/ESC-50">ESC-50 dataset</a> (original Freesound uploads) and Wikimedia Commons, trimmed and level-matched:</p>
+            <ul id="creditsList"></ul>
+          </details>
 
           <button id="btnAboutHardRefresh" class="btn-secondary" style="width: 100%; border-color: rgba(245, 158, 11, 0.4); color: var(--primary); margin-top: 6px;">
             🔄 Force Hard Refresh & Clear Offline Cache
