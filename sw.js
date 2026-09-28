@@ -2,7 +2,7 @@
 // Network-first: when online every load gets the latest files (so a normal refresh picks up
 // new deploys); the cache is the fallback when offline. All sounds are precached at install.
 
-const CACHE_NAME = 'bark-v2';
+const CACHE_NAME = 'bark-v3';
 
 const PRECACHE_ASSETS = [
   './',

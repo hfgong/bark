@@ -46,6 +46,12 @@
       "short_name": "Cats",
       "description": "Quick Cat Meow sounds",
       "url": "./#cats"
+    },
+    {
+      "name": "More Sounds",
+      "short_name": "More",
+      "description": "Clicker, whistle, door knock, air horn and more",
+      "url": "./#more"
     }
   ]
 }
