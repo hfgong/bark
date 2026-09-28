@@ -1,0 +1,203 @@
+[
+ {
+  "id": "big_dog",
+  "category": "dog",
+  "icon": "🐕",
+  "title": "Big Dog",
+  "desc": "Deep single woof",
+  "credit": "Big_dog_bark_01.aiff by pgonsilva (freesound.org/s/182395), CC BY",
+  "files": [
+   "sounds/big_dog_1.wav"
+  ]
+ },
+ {
+  "id": "guard_dog",
+  "category": "dog",
+  "icon": "🚨",
+  "title": "Guard Dog",
+  "desc": "Firm warning bark",
+  "credit": "Dog Barks.wav by UnderlinedDesigns (freesound.org/s/191687), CC0",
+  "files": [
+   "sounds/guard_dog_1.wav",
+   "sounds/guard_dog_2.wav",
+   "sounds/guard_dog_3.wav",
+   "sounds/guard_dog_4.wav"
+  ]
+ },
+ {
+  "id": "spaniel",
+  "category": "dog",
+  "icon": "🦮",
+  "title": "Springer Spaniel",
+  "desc": "Bright, eager bark",
+  "credit": "animals_dog_bark_springer_spaniel_001.wav by soundscalpel.com (freesound.org/s/110389), CC BY",
+  "files": [
+   "sounds/spaniel_1.wav"
+  ]
+ },
+ {
+  "id": "shih_tzu",
+  "category": "dog",
+  "icon": "🐶",
+  "title": "Shih Tzu Pug",
+  "desc": "Bark with a howly tail",
+  "credit": "Dog Barking - Shih Tzu Pug by bspiller5 (freesound.org/s/180256), CC BY",
+  "files": [
+   "sounds/shih_tzu_1.wav",
+   "sounds/shih_tzu_2.wav",
+   "sounds/shih_tzu_3.wav",
+   "sounds/shih_tzu_4.wav"
+  ]
+ },
+ {
+  "id": "dachshund",
+  "category": "dog",
+  "icon": "🌭",
+  "title": "Mini Dachshund",
+  "desc": "Lively indoor bark",
+  "credit": "Miniature Dachshund Bark - Indoors.wav by Ligidium (freesound.org/s/192236), CC0",
+  "files": [
+   "sounds/dachshund_1.wav",
+   "sounds/dachshund_2.wav",
+   "sounds/dachshund_3.wav",
+   "sounds/dachshund_4.wav"
+  ]
+ },
+ {
+  "id": "poodle",
+  "category": "dog",
+  "icon": "🐩",
+  "title": "Poodle",
+  "desc": "Single sharp bark",
+  "credit": "one bark of a poodle dog by fabiopx (freesound.org/s/170015), CC0",
+  "files": [
+   "sounds/poodle_1.wav"
+  ]
+ },
+ {
+  "id": "yappy_pup",
+  "category": "dog",
+  "icon": "🐾",
+  "title": "Yappy Pup",
+  "desc": "High, snappy yip",
+  "credit": "Dog bark2.wav by MisterTood (freesound.org/s/9032), CC0",
+  "files": [
+   "sounds/yappy_pup_1.wav",
+   "sounds/yappy_pup_2.wav",
+   "sounds/yappy_pup_3.wav",
+   "sounds/yappy_pup_4.wav"
+  ]
+ },
+ {
+  "id": "wolf_howl",
+  "category": "dog",
+  "icon": "🐺",
+  "title": "Wolf Howl",
+  "desc": "Long wild howl",
+  "files": [
+   "sounds/dog_wolf_howl.mp3"
+  ],
+  "credit": "Wolf howls, U.S. Fish and Wildlife Service via Wikimedia Commons (public domain)"
+ },
+ {
+  "id": "classic_meow",
+  "category": "cat",
+  "icon": "🐱",
+  "title": "Classic Meow",
+  "desc": "Friendly meow",
+  "credit": "Cat meowing x5 by peridactyloptrix (freesound.org/s/214759), CC0",
+  "files": [
+   "sounds/classic_meow_1.wav",
+   "sounds/classic_meow_2.wav",
+   "sounds/classic_meow_3.wav",
+   "sounds/classic_meow_4.wav"
+  ]
+ },
+ {
+  "id": "loud_meow",
+  "category": "cat",
+  "icon": "📢",
+  "title": "Loud Meow",
+  "desc": "Insistent, attention-seeking",
+  "credit": "Cat.mp3 by telesik (freesound.org/s/172639), CC BY",
+  "files": [
+   "sounds/loud_meow_1.wav",
+   "sounds/loud_meow_2.wav",
+   "sounds/loud_meow_3.wav",
+   "sounds/loud_meow_4.wav"
+  ]
+ },
+ {
+  "id": "hungry_cat",
+  "category": "cat",
+  "icon": "🥣",
+  "title": "Hungry Cat",
+  "desc": "Dinner-time demand",
+  "credit": "20100423.hungry.cats.02.wav / .05.wav by dobroide (freesound.org/s/95695, /95698), CC BY",
+  "files": [
+   "sounds/hungry_cat_1.wav",
+   "sounds/hungry_cat_2.wav",
+   "sounds/hungry_cat_3.wav"
+  ]
+ },
+ {
+  "id": "soft_meow",
+  "category": "cat",
+  "icon": "🌙",
+  "title": "Soft Meow",
+  "desc": "Gentle, quiet mew",
+  "credit": "garage cat 01.wav by Kyster (freesound.org/s/82274), CC BY",
+  "files": [
+   "sounds/soft_meow_1.wav",
+   "sounds/soft_meow_2.wav",
+   "sounds/soft_meow_3.wav"
+  ]
+ },
+ {
+  "id": "little_mew",
+  "category": "cat",
+  "icon": "🍼",
+  "title": "Little Mew",
+  "desc": "Small, high mew",
+  "credit": "20100423.hungry.cats.04.wav by dobroide (freesound.org/s/95697), CC BY",
+  "files": [
+   "sounds/little_mew_1.wav"
+  ]
+ },
+ {
+  "id": "mad_cat",
+  "category": "cat",
+  "icon": "😾",
+  "title": "Mad Cat Yowl",
+  "desc": "Long, grumpy yowl",
+  "credit": "MAD CAT !.wav by temawas (freesound.org/s/133047), CC0",
+  "files": [
+   "sounds/mad_cat_1.wav",
+   "sounds/mad_cat_2.wav",
+   "sounds/mad_cat_3.wav",
+   "sounds/mad_cat_4.wav"
+  ]
+ },
+ {
+  "id": "purr",
+  "category": "cat",
+  "icon": "💤",
+  "title": "Purr",
+  "desc": "Relaxed purring",
+  "files": [
+   "sounds/cat_gentle_purr.mp3"
+  ],
+  "credit": "Purring cat by Mysid via Wikimedia Commons (public domain)"
+ },
+ {
+  "id": "hiss",
+  "category": "cat",
+  "icon": "😼",
+  "title": "Hiss",
+  "desc": "Warning hiss",
+  "files": [
+   "sounds/cat_angry_hiss.mp3"
+  ],
+  "credit": "Cat hissing by Zabuhailo via Wikimedia Commons (CC BY 3.0)"
+ }
+]
