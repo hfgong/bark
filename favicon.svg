@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
-    <!-- 主背景：与 Mobile LaTeX / AirCopy / 农历 / 漢字 同系的蓝紫渐变 -->
+    <!-- Shared suite background (Mobile LaTeX / AirCopy / 农历 / 漢字 / Big Text) -->
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#4338ca" />
       <stop offset="45%" stop-color="#2563eb" />
@@ -15,9 +15,9 @@
       <stop offset="0%" stop-color="#ffffff" />
       <stop offset="100%" stop-color="#bae6fd" />
     </linearGradient>
-    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#67e8f9" />
-      <stop offset="100%" stop-color="#38bdf8" />
+    <linearGradient id="waveGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#67e8f9" />
     </linearGradient>
     <linearGradient id="sparkleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#38bdf8" />
@@ -36,23 +36,24 @@
   <rect width="512" height="512" rx="118" fill="url(#innerGlow)" />
   <rect x="2" y="2" width="508" height="508" rx="116" fill="none" stroke="#ffffff" stroke-width="4" stroke-opacity="0.25" />
 
-  <g transform="translate(256 256) scale(1.1) translate(-256 -256)">
-    <!-- 爪印（狗与猫） -->
-    <g filter="url(#shadow)" fill="url(#pawGrad)" transform="translate(-26 18)">
+  <g transform="translate(256 256) scale(1.06) translate(-256 -256)">
+    <!-- Sound waves radiating from the paw -->
+    <g fill="none" stroke="url(#waveGrad)" stroke-linecap="round" filter="url(#glow)">
+      <path d="M 217.6 206.3 A 128 128 0 0 1 304.8 345.8" stroke-width="24" stroke-opacity="1" />
+      <path d="M 236.7 147.3 A 190 190 0 0 1 366.2 354.4" stroke-width="22" stroke-opacity="0.85" />
+      <path d="M 255.9 88.3 A 252 252 0 0 1 427.5 363.1" stroke-width="20" stroke-opacity="0.65" />
+    </g>
+    <!-- Small paw print (dogs and cats) -->
+    <g filter="url(#shadow)" fill="url(#pawGrad)" transform="translate(178 328) scale(0.5) translate(-256 -290)">
       <path d="M 256 262 C 300 262, 330 300, 356 336 C 380 370, 372 404, 336 410 C 306 415, 286 398, 256 398 C 226 398, 206 415, 176 410 C 140 404, 132 370, 156 336 C 182 300, 212 262, 256 262 Z" />
       <ellipse cx="150" cy="238" rx="36" ry="46" transform="rotate(-22 150 238)" />
       <ellipse cx="212" cy="168" rx="38" ry="50" transform="rotate(-8 212 168)" />
       <ellipse cx="300" cy="168" rx="38" ry="50" transform="rotate(8 300 168)" />
       <ellipse cx="362" cy="238" rx="36" ry="46" transform="rotate(22 362 238)" />
     </g>
-    <!-- 声波 -->
-    <g fill="none" stroke="url(#waveGrad)" stroke-linecap="round" filter="url(#glow)">
-      <path d="M 402 132 A 92 92 0 0 1 430 218" stroke-width="16" />
-      <path d="M 432 92 A 142 142 0 0 1 470 226" stroke-width="12" stroke-opacity="0.8" />
-    </g>
   </g>
 
-  <!-- 星芒 ✦ -->
+  <!-- Sparkle ✦ -->
   <path d="M 432 382 Q 432 410, 404 410 Q 432 410, 432 438 Q 432 410, 460 410 Q 432 410, 432 382 Z"
         fill="url(#sparkleGrad)" filter="url(#glow)" />
   <circle cx="468" cy="370" r="6" fill="#67e8f9" />
