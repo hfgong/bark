@@ -84,13 +84,16 @@
       <button class="banner-close" id="dismissIosBanner" aria-label="Dismiss">✕</button>
     </div>
 
-    <!-- Navigation Tabs: Dogs / Cats / Settings -->
+    <!-- Navigation Tabs: Dogs / Cats / More / Settings -->
     <nav class="tabs-container" role="tablist">
       <button id="tabDogs" class="tab-btn active dog-tab" role="tab" aria-selected="true">
         <span>🐶 Dogs</span>
       </button>
       <button id="tabCats" class="tab-btn cat-tab" role="tab" aria-selected="false">
         <span>🐱 Cats</span>
+      </button>
+      <button id="tabMore" class="tab-btn more-tab" role="tab" aria-selected="false">
+        <span>📣 More</span>
       </button>
       <button id="tabTools" class="tab-btn tools-tab" role="tab" aria-selected="false">
         <span>🎛️ Controls</span>
@@ -99,7 +102,7 @@
 
     <!-- Main Content Area -->
     <main>
-      <p class="tap-hint">One tap = one bark. Tap again for the next one.</p>
+      <p class="tap-hint">One tap = one sound. Tap again for the next one.</p>
 
       <!-- Dogs Tab Pane -->
       <div id="dogsPane" class="tab-pane">
@@ -111,6 +114,13 @@
       <!-- Cats Tab Pane (hidden by default) -->
       <div id="catsPane" class="tab-pane" style="display: none;">
         <div class="sounds-grid" id="catsGrid">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+
+      <!-- More Tab Pane: people, home & training sounds (hidden by default) -->
+      <div id="morePane" class="tab-pane" style="display: none;">
+        <div class="sounds-grid" id="moreGrid">
           <!-- Populated dynamically by app.js -->
         </div>
       </div>
@@ -300,13 +310,13 @@
           <p><strong>Features:</strong></p>
           <ul>
             <li>✈️ <strong>100% Offline:</strong> All dog and cat sounds are cached by a Service Worker. Works in Airplane Mode.</li>
-            <li>👆 <strong>One tap, one bark:</strong> Every sound is a single, trimmed bark or meow that starts instantly; quick taps overlap naturally and rotate through several takes of the same animal.</li>
+            <li>👆 <strong>One tap, one sound:</strong> Every sound is a single, trimmed bark, meow or noise that starts instantly; quick taps overlap naturally and rotate through several takes of the same animal.</li>
             <li>🎵 <strong>Pitch Control:</strong> Deep / Normal / High shifts the voice like a bigger or smaller animal.</li>
             <li>🐕 <strong>Dog Whistle & Prank Timer:</strong> Built-in ultrasonic generator and delayed surprise triggers.</li>
           </ul>
           <details class="credits">
             <summary>Sound credits &amp; licenses</summary>
-            <p>Recordings from the <a href="https://github.com/karolpiczak/ESC-50">ESC-50 dataset</a> (original Freesound uploads) and Wikimedia Commons, trimmed and level-matched:</p>
+            <p>Recordings from the <a href="https://github.com/karolpiczak/ESC-50">ESC-50 dataset</a> (original Freesound uploads) and Wikimedia Commons, trimmed and level-matched; some sounds are generated in code:</p>
             <ul id="creditsList"></ul>
           </details>
 

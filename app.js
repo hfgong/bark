@@ -63,14 +63,17 @@
   // DOM Elements
   const tabDogs = document.getElementById('tabDogs');
   const tabCats = document.getElementById('tabCats');
+  const tabMore = document.getElementById('tabMore');
   const tabTools = document.getElementById('tabTools');
 
   const dogsPane = document.getElementById('dogsPane');
   const catsPane = document.getElementById('catsPane');
+  const morePane = document.getElementById('morePane');
   const toolsPane = document.getElementById('toolsPane');
 
   const dogsGrid = document.getElementById('dogsGrid');
   const catsGrid = document.getElementById('catsGrid');
+  const moreGrid = document.getElementById('moreGrid');
 
   const sliderVolume = document.getElementById('sliderVolume');
   const valVolume = document.getElementById('valVolume');
@@ -334,13 +337,13 @@
 
   // --- UI Population & Card Interaction ---
   function renderSoundCards() {
-    dogsGrid.innerHTML = '';
-    catsGrid.innerHTML = '';
+    const grids = { dog: dogsGrid, cat: catsGrid, other: moreGrid };
+    Object.values(grids).forEach((grid) => grid.replaceChildren());
 
     SOUNDS.forEach((sound) => {
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = `sound-card ${sound.category === 'cat' ? 'cat-card' : ''}`;
+      card.className = `sound-card ${sound.category}-card`;
       card.dataset.soundId = sound.id;
 
       card.innerHTML = `
@@ -358,11 +361,7 @@
 
       card.addEventListener('click', () => playSound(sound));
 
-      if (sound.category === 'dog') {
-        dogsGrid.appendChild(card);
-      } else {
-        catsGrid.appendChild(card);
-      }
+      (grids[sound.category] || moreGrid).appendChild(card);
     });
   }
 
@@ -384,24 +383,25 @@
   function setupTabs() {
     tabDogs.addEventListener('click', () => switchTab('dog'));
     tabCats.addEventListener('click', () => switchTab('cat'));
+    tabMore.addEventListener('click', () => switchTab('other'));
     tabTools.addEventListener('click', () => switchTab('tools'));
   }
 
   function switchTab(tab) {
     currentActiveTab = tab;
-    tabDogs.classList.toggle('active', tab === 'dog');
-    tabCats.classList.toggle('active', tab === 'cat');
-    tabTools.classList.toggle('active', tab === 'tools');
+    const tabs = [
+      [tabDogs, dogsPane, 'dog'],
+      [tabCats, catsPane, 'cat'],
+      [tabMore, morePane, 'other'],
+      [tabTools, toolsPane, 'tools']
+    ];
+    tabs.forEach(([button, pane, name]) => {
+      button.classList.toggle('active', tab === name);
+      button.setAttribute('aria-selected', tab === name);
+      pane.style.display = tab === name ? 'block' : 'none';
+    });
 
-    tabDogs.setAttribute('aria-selected', tab === 'dog');
-    tabCats.setAttribute('aria-selected', tab === 'cat');
-    tabTools.setAttribute('aria-selected', tab === 'tools');
-
-    dogsPane.style.display = tab === 'dog' ? 'block' : 'none';
-    catsPane.style.display = tab === 'cat' ? 'block' : 'none';
-    toolsPane.style.display = tab === 'tools' ? 'block' : 'none';
-
-    if ((tab === 'dog' || tab === 'cat') && selectedSound?.category !== tab) {
+    if (tab !== 'tools' && selectedSound?.category !== tab) {
       const first = SOUNDS.find((s) => s.category === tab);
       if (first) selectSound(first);
     }
@@ -858,6 +858,8 @@
 
     if (window.location.hash === '#cats') {
       switchTab('cat');
+    } else if (window.location.hash === '#more') {
+      switchTab('other');
     }
   }
 
